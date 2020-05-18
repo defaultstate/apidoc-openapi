@@ -4,6 +4,7 @@ const path = require('path');
 const apidoc = require('apidoc-core');
 const mkdirp = require('mkdirp');
 const program = require('commander');
+const _ = require('lodash');
 
 const pkg = require('../package');
 
@@ -15,6 +16,7 @@ program
   .option('-p, --project <path>', 'path to apidoc config file')
   .option('-s, --src <path>', 'path to source files')
   .option('-o, --out <path>', 'path to output file')
+  .option('-t, --template <path>', 'path to OpenAPI template file', '')
   .option('-v, --verbose', 'be verbose');
 
 
@@ -37,26 +39,29 @@ class Logger {
 
 
 function main() {
+  const logger = new Logger();
   program.parse(process.argv);
-
   const cwd = process.cwd();
   const paths = {
     apidoc: path.resolve(cwd, program.project),
     src: path.resolve(cwd, program.src),
     out: program.out && path.resolve(cwd, program.out),
   };
-  const logger = new Logger();
   const { project, data } = getInput(paths, logger);
 
   logger.debug('APIDOC.PROJECT:\n' + JSON.stringify(project, null, 2));
   logger.debug('APIDOC.DATA:\n' + JSON.stringify(data, null, 2));
 
   const openapi = transformInput(project, data);
-  const output = JSON.stringify(openapi, null, 2);
-
+  let tmpl = {};
+  if (program.template !== '' && fs.existsSync(program.template)) {
+    const tmplPath = path.resolve(cwd, program.template);
+    tmpl = JSON.parse(fs.readFileSync(tmplPath));
+  }
+  const combined = _.merge(openapi, tmpl);
+  const output = JSON.stringify(combined, null, 2);
   if (paths.out) {
-    mkdirp.sync(path.dirname(paths.out));
-    fs.writeFileSync(paths.out, output);
+    fs.writeFileSync(program.out, output);
   } else {
     console.log(output);
   }
@@ -74,14 +79,13 @@ function getInput(paths, logger) {
   });
   return {
     project: JSON.parse(result.project),
-    data: JSON.parse(result.data),
+    data: JSON.parse(result.data)
   };
 }
 
 
 function transformInput(project, data) {
   return {
-    openapi: '3.0.1',
     info: getInfo(project),
     servers: getServers(project),
     paths: getPaths(data),
@@ -134,18 +138,25 @@ function getPaths(data) {
 
     const params = [
       ...(item.header ? item.header.fields.Header : []),
-      ...(item.parameter ? item.parameter.fields.Parameter : []),
+      ...(item.parameter && item.parameter && item.parameter.fields && item.parameter.fields.Parameter ? item.parameter.fields.Parameter : []),
     ];
-    for (const param of filterParentParams(params)) {
-      const isPathParam = item.url.split('/').indexOf(`:${param.field}`) !== -1;
-      const isHeader = !isPathParam && param.group === 'Header';
+    if (item && item.parameter && item.parameter.fields) {
+      const pathParams = item.parameter.fields['URI Parameter']
+      if (Array.isArray(pathParams)) {
+        for (const param of pathParams) {
+         addParam(param, pathParams, parameterObjects)
+        }
+      }
+    }
+    for (const param of params) {
+      const isHeader = param.group === 'Header';
       const isQueryParam = !isHeader && ['get', 'delete'].indexOf(httpMethod) !== -1;
       const isBodyParam = !isQueryParam;
-      if (isPathParam || isHeader || isQueryParam) {
+      if (isHeader || isQueryParam) {
         const parameterObject = {
           name: param.field,
           description: param.description,
-          in: (isPathParam && 'path') || (isHeader && 'header') || (isQueryParam && 'query'),
+          in: (isHeader && 'header') || (isQueryParam && 'query'),
           required: !param.optional,
           content: {
             [contentType]: {
@@ -179,7 +190,6 @@ function getPaths(data) {
         }
       }
     }
-
     const responseGroups = [
       ...(item.success ? Object.values(item.success.fields) : []),
       ...(item.error ? Object.values(item.error.fields) : []),
@@ -217,9 +227,9 @@ function getPaths(data) {
       operationObject.deprecated = true;
     }
 
-    if (!parameterObjects.length) {
-      delete operationObject.parameters;
-    }
+    // if (!parameterObjects.length) {
+    //   delete operationObject.parameters;
+    // }
     if (!Object.keys(requestBodyObject).length) {
       delete operationObject.requestBody;
     }
@@ -228,13 +238,32 @@ function getPaths(data) {
   return pathsObject;
 }
 
-function getComponents() {}
+function addParam(param, params, store) {
+  const parameterObject = {
+    name: param.field,
+    description: param.description,
+    in: 'path', //TODO handle query params
+    required: !param.optional,
+    content: {
+      [contentType]: {
+        schema: getSchema(params, param),
+      },
+    },
+  };
+  store.push(parameterObject);
+}
 
-function getSecurity() {}
+function addRequest(req, reqs) {
+}
 
-function getTags() {}
+function getComponents() { }
 
-function getExternalDocs() {}
+function getSecurity() {
+}
+
+function getTags() { }
+
+function getExternalDocs() { }
 
 
 function toPatternedFieldname(url) {
@@ -254,7 +283,7 @@ function filterParentParams(params) {
 
 function getSchema(params, param) {
   const isObject = param.type === 'Object';
-  const isArray = param.type.indexOf('[]') !== -1;
+  const isArray = param.type && param.type.indexOf('[]') !== -1;
   const childParams = params.filter((p) => {
     const ppath = `${param.field}.`;
     return p.field.indexOf(ppath) === 0 &&
@@ -287,7 +316,13 @@ function getSchema(params, param) {
     schema = {
       type: param.type.toLowerCase(),
     };
+    if (param.type.toLowerCase() === "string" && param.size) {
+      schema.maxLength = param.size.replace('..','');
+    }
+    if (param.allowedValues) {
+      schema.enum = param.allowedValues
+    }
   }
-
   return schema;
 }
+main();

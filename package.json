@@ -1,21 +1,61 @@
 {
-  "name": "@forfuture/apidoc-openapi",
-  "version": "0.0.1",
-  "description": "Generate OpenAPI definition file from apiDoc comments",
-  "license": "MIT",
-  "contributors": [
-    "GochoMugo <mugo@forfuture.co.ke>"
+  "_from": "apidoc-openapi@0.0.4",
+  "_id": "apidoc-openapi@0.0.4",
+  "_inBundle": false,
+  "_integrity": "sha512-YiUXHaIrCNPCSaWHp4FTF6QipVNWXW1qz5J6n84B99XKOZ+K2xjU+kVOPm2nzavliC9E6jkVo18NmgVo/hB/Og==",
+  "_location": "/apidoc-openapi",
+  "_phantomChildren": {
+    "glob": "7.1.6",
+    "graceful-fs": "4.2.4",
+    "lodash": "4.17.15",
+    "safer-buffer": "2.1.2",
+    "universalify": "0.1.2"
+  },
+  "_requested": {
+    "type": "version",
+    "registry": true,
+    "raw": "apidoc-openapi@0.0.4",
+    "name": "apidoc-openapi",
+    "escapedName": "apidoc-openapi",
+    "rawSpec": "0.0.4",
+    "saveSpec": null,
+    "fetchSpec": "0.0.4"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
   ],
+  "_resolved": "https://registry.npmjs.org/apidoc-openapi/-/apidoc-openapi-0.0.4.tgz",
+  "_shasum": "7410d301055709f03eb001bf12fe9f55232c33a3",
+  "_spec": "apidoc-openapi@0.0.4",
+  "_where": "/Users/chrisg/dev/aiven/core/doc/apidoc_work",
   "bin": {
     "apidoc-openapi": "bin/apidoc-openapi"
   },
-  "scripts": {
-    "start:example": "bin/apidoc-openapi --project example/apidoc.json --src example --out example/openapi.json"
-  },
+  "bundleDependencies": false,
+  "contributors": [
+    {
+      "name": "GochoMugo",
+      "email": "mugo@forfuture.co.ke"
+    },
+    {
+      "name": "encima",
+      "email": "chrisg@aiven.io"
+    }
+  ],
   "dependencies": {
     "apidoc-core": "^0.8.3",
     "commander": "^2.16.0",
+    "lodash": "^4.17.15",
     "mkdirp": "^0.5.1"
   },
-  "devDependencies": {}
+  "deprecated": false,
+  "description": "Generate OpenAPI definition file from apiDoc comments",
+  "devDependencies": {},
+  "license": "MIT",
+  "name": "apidoc-openapi",
+  "scripts": {
+    "start:example": "bin/apidoc-openapi --project example/apidoc.json --src example --out example/openapi.json -v"
+  },
+  "version": "0.0.5"
 }
