@@ -131,6 +131,9 @@ function getPaths(data) {
       parameters: [],
       requestBody: {},
       responses: {},
+      tags: [
+        item.group
+      ]
     };
     const parameterObjects = operationObject.parameters;
     const requestBodyObject = operationObject.requestBody;
