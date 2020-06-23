@@ -58,7 +58,7 @@ function main() {
     const tmplPath = path.resolve(cwd, program.template);
     tmpl = JSON.parse(fs.readFileSync(tmplPath));
   }
-  const combined = _.merge(openapi, tmpl);
+  const combined = _.merge(tmpl, openapi);
   const output = JSON.stringify(combined, null, 2);
   if (paths.out) {
     fs.writeFileSync(program.out, output);
