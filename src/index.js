@@ -98,7 +98,7 @@ function transformInput(project, data) {
 
 function getInfo(project) {
   return {
-    title: project.name,
+    title: project.title,
     description: project.description,
     version: project.version,
   };
