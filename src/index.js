@@ -309,6 +309,9 @@ function getSchema(params, param) {
         schema.required.push(prop);
       }
     }
+    if(schema.required.length < 1) {
+      delete schema.required;
+    }
   } else if (isArray) {
     schema = {
       type: 'array',
