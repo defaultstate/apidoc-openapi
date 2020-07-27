@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 const apidoc = require('apidoc-core');
-const mkdirp = require('mkdirp');
 const program = require('commander');
 const _ = require('lodash');
 
@@ -24,14 +23,25 @@ class Logger {
   constructor() {
     this._verbose = program.verbose;
   }
+
   debug() {
     if (this._verbose) {
       console.log(arguments[0]);
     }
   }
-  verbose() { this.debug(...arguments); }
-  info() { this.debug(...arguments); }
-  warn() { this.debug(...arguments); }
+
+  verbose() {
+    this.debug(...arguments);
+  }
+
+  info() {
+    this.debug(...arguments);
+  }
+
+  warn() {
+    this.debug(...arguments);
+  }
+
   error() {
     console.error(arguments[0]);
   }
@@ -66,8 +76,8 @@ function main() {
     console.log(output);
   }
 }
-exports.main = main;
 
+exports.main = main;
 
 function getInput(paths, logger) {
   apidoc.setLogger(logger);
@@ -85,14 +95,24 @@ function getInput(paths, logger) {
 
 
 function transformInput(project, data) {
+  let info, servers, paths, components, security, tags, externalDocs;
+
+  info = getInfo(project);
+  servers = getServers(project);
+  components = getComponents(data);
+  paths = getPaths(data);
+  security = getSecurity();
+  tags = getTags();
+  externalDocs = getExternalDocs();
+
   return {
-    info: getInfo(project),
-    servers: getServers(project),
-    paths: getPaths(data),
-    components: getComponents(),
-    security: getSecurity(),
-    tags: getTags(),
-    externalDocs: getExternalDocs(),
+    info,
+    servers,
+    paths,
+    components,
+    security,
+    tags,
+    externalDocs
   };
 }
 
@@ -111,7 +131,6 @@ function getServers(project) {
     },
   ];
 }
-
 
 function getPaths(data) {
   const pathsObject = {};
@@ -147,7 +166,7 @@ function getPaths(data) {
       const pathParams = item.parameter.fields['URI Parameter']
       if (Array.isArray(pathParams)) {
         for (const param of pathParams) {
-         addParam(param, pathParams, parameterObjects)
+          addParam(param, pathParams, parameterObjects)
         }
       }
     }
@@ -199,30 +218,22 @@ function getPaths(data) {
     ];
     for (const responses of responseGroups) {
       let responseObject;
-      let schema;
       for (const response of filterParentParams(responses)) {
         if (!responseObject) {
           // apiDoc success group defaults to 'Success 200'.
           // apiDoc error group defaults to 'Error 4xx'.
-          const statusCode = response.group.replace(/(Success|Error)\ /, '').toUpperCase();
+          const { responseName, statusCode } = getResponseMeta(response);
           responseObject = {
-            description: `${statusCode} response`,
+            description: `${responseName}`,
             content: {
               [contentType]: {
                 schema: {
-                  type: 'object',
-                  properties: {},
-                  required: [],
+                  $ref: `#/components/schemas/${responseName}`
                 },
               },
             },
           };
           responsesObject[statusCode] = responseObject;
-        }
-        schema = responseObject.content[contentType].schema;
-        schema.properties[response.field] = getSchema(responses, response);
-        if (!response.optional) {
-          schema.required.push(response.field);
         }
       }
     }
@@ -257,18 +268,53 @@ function addParam(param, params, store) {
   store.push(parameterObject);
 }
 
-function addRequest(req, reqs) {
+function getComponents(data) {
+  const parameters = {};
+  const schemas = {};
+  const responsesObject = {};
+
+  for (const item of data) {
+    const responseGroups = [
+      ...(item.success ? Object.values(item.success.fields) : []),
+      ...(item.error ? Object.values(item.error.fields) : []),
+    ];
+    for (const responses of responseGroups) {
+      let responseObject;
+      for (const response of filterParentParams(responses)) {
+        if (!responseObject) {
+          // apiDoc success group defaults to 'Success 200'.
+          // apiDoc error group defaults to 'Error 4xx'.
+          const { responseName, statusCode } = getResponseMeta(response);
+          responseObject = {
+            type: 'object',
+            properties: {}
+          };
+          schemas[responseName] = responseObject;
+        }
+
+        responseObject.properties[response.field] = getSchema(responses, response);
+        if (!response.optional) {
+          if(!responseObject.required || !_.isArray(responseObject.required)) {
+            responseObject.required = [];
+          }
+          responseObject.required.push(response.field);
+        }
+      }
+    }
+  }
+
+  return {
+    parameters,
+    schemas,
+    responses: responsesObject
+  };
 }
 
-function getComponents() { }
-
-function getSecurity() {
-}
+function getSecurity() { }
 
 function getTags() { }
 
-function getExternalDocs() { }
-
+function getExternalDocs() {}
 
 function toPatternedFieldname(url) {
   return url.split('/').map((segment) => {
@@ -309,7 +355,7 @@ function getSchema(params, param) {
         schema.required.push(prop);
       }
     }
-    if(schema.required.length < 1) {
+    if (schema.required.length < 1) {
       delete schema.required;
     }
   } else if (isArray) {
@@ -324,7 +370,7 @@ function getSchema(params, param) {
       type: param.type.toLowerCase(),
     };
     if (param.type.toLowerCase() === "string" && param.size) {
-      schema.maxLength = param.size.replace('..','');
+      schema.maxLength = param.size.replace('..', '');
     }
     if (param.allowedValues) {
       schema.enum = param.allowedValues
@@ -332,4 +378,19 @@ function getSchema(params, param) {
   }
   return schema;
 }
+
+/**
+ * Return response name and status code from ApiDoc response comment
+ * @param response
+ * @returns {{responseName: *, statusCode: *}}
+ */
+function getResponseMeta(response) {
+  const pattern = /^([a-zA-Z_\-]+)?(?:[\s])?([0-9]{3})+$/g
+  let [, responseName, statusCode] = pattern.exec(response.group)
+  if (!responseName) {
+    responseName = `${statusCode}-response`
+  }
+  return { responseName, statusCode }
+}
+
 main();
